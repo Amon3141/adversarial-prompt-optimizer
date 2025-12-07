@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Adversarial Optimization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-white min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <header
+            class="mb-8 flex justify-between items-center bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700">
+            <div>
+                <h1
+                    class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                    Adversarial Prompt Optimizer</h1>
+                <p class="text-gray-400 mt-2">Attack vs Defense Loop</p>
+            </div>
+            <div class="flex gap-4 items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-400">Rounds:</span>
+                    <input type="number" id="rounds" value="5"
+                        class="bg-slate-900 border border-slate-600 rounded px-3 py-2 w-20 text-center focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <button onclick="startLoop()" id="startBtn"
+                    class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-md hover:shadow-blue-500/20 active:scale-95">Start
+                    Loop</button>
+                <button onclick="stopLoop()" id="stopBtn"
+                    class="bg-red-600 hover:bg-red-500 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-md hover:shadow-red-500/20 active:scale-95 hidden">Stop</button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- Stats Card -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                <h2 class="text-xl font-semibold mb-4 text-gray-200 border-b border-slate-700 pb-2">Status</h2>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">Current Round:</span>
+                        <span id="currentRound" class="text-2xl font-mono font-bold text-blue-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-400">State:</span>
+                        <span id="state" class="px-3 py-1 rounded-full bg-slate-700 text-sm font-medium">Idle</span>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-slate-700">
+                        <h3 class="text-sm font-semibold text-gray-400 mb-2">Scores</h3>
+                        <div class="flex justify-between">
+                            <div class="text-center">
+                                <div class="text-xs text-gray-500 uppercase">Best Attack</div>
+                                <div id="bestAttackScore" class="text-xl text-green-400 font-mono">0</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-xs text-gray-500 uppercase">Best Defense</div>
+                                <div id="bestDefenseScore" class="text-xl text-purple-400 font-mono">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Best Prompts -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg">
+                <h2 class="text-xl font-semibold mb-4 text-gray-200 border-b border-slate-700 pb-2">Current Best</h2>
+                <div class="space-y-4">
+                    <div>
+                        <div class="text-xs text-purple-400 uppercase font-bold mb-1">Defense Prompt</div>
+                        <div id="currentDefense"
+                            class="bg-slate-900 p-3 rounded border border-slate-700 text-xs font-mono text-gray-300 h-24 overflow-y-auto">
+                            Waiting for data...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attack Prompts Grid -->
+        <h2 class="text-xl font-semibold mb-4 text-gray-200">Current Attack Swarm</h2>
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8" id="attackGrid">
+            <!-- Will be populated by JS -->
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center text-gray-500">
+                No active prompts
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-lg h-96 flex flex-col">
+            <h2 class="text-xl font-semibold mb-4 text-gray-200 flex justify-between">
+                <span>Logs</span>
+                <button onclick="clearLogs()" class="text-xs text-gray-500 hover:text-white">Clear</button>
+            </h2>
+            <div id="logs"
+                class="flex-1 bg-slate-900 p-4 rounded border border-slate-700 font-mono text-xs text-green-300 overflow-y-auto whitespace-pre-wrap">
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let pollingInterval = null;
+
+        async function startLoop() {
+            const rounds = document.getElementById('rounds').value;
+            const res = await fetch('/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rounds })
+            });
+            const data = await res.json();
+            if (data.status === 'started') {
+                document.getElementById('startBtn').classList.add('hidden');
+                document.getElementById('stopBtn').classList.remove('hidden');
+                startPolling();
+                log("System: " + data.message);
+            } else {
+                log("Error: " + data.message);
+            }
+        }
+
+        async function stopLoop() {
+            await fetch('/stop', { method: 'POST' });
+            document.getElementById('startBtn').classList.remove('hidden');
+            document.getElementById('stopBtn').classList.add('hidden');
+            log("System: Stop requested...");
+        }
+
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(updateStatus, 1000);
+        }
+
+        async function updateStatus() {
+            try {
+                const res = await fetch('/status');
+                const data = await res.json();
+
+                document.getElementById('currentRound').innerText = data.round;
+                document.getElementById('state').innerText = data.state;
+                document.getElementById('bestAttackScore').innerText = data.scores.attack;
+                document.getElementById('bestDefenseScore').innerText = data.scores.defense;
+
+                if (data.prompts.defense) {
+                    document.getElementById('currentDefense').innerText = data.prompts.defense;
+                }
+
+                // Update Grid
+                const grid = document.getElementById('attackGrid');
+                if (data.prompts.attacks && data.prompts.attacks.length > 0) {
+                    grid.innerHTML = data.prompts.attacks.map((p, i) => `
+                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex flex-col h-full">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-bold text-red-400">Attack ${i + 1}</span>
+                                <div class="flex gap-1">
+                                     <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-white" title="Stage">S${p.stage || '?'}</span>
+                                     <span class="text-xs bg-slate-700 px-2 py-0.5 rounded text-white">${p.score || '-'} pts</span>
+                                </div>
+                            </div>
+                            <div class="flex-1 bg-slate-900 p-2 rounded border border-slate-700 text-[10px] font-mono text-gray-400 overflow-y-auto h-32 mb-2">
+                                ${p.text}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                if (data.logs && data.logs.length > 0) {
+                    data.logs.forEach(l => log(l));
+                }
+
+                if (!data.is_running && document.getElementById('stopBtn').classList.contains('hidden') === false) {
+                    document.getElementById('startBtn').classList.remove('hidden');
+                    document.getElementById('stopBtn').classList.add('hidden');
+                }
+
+            } catch (e) {
+                console.error("Polling error", e);
+            }
+        }
+
+        function log(msg) {
+            const logs = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.innerText = `> ${msg}`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        // Initial check
+        updateStatus();
+    </script>
+</body>
+
+</html>
