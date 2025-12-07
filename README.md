@@ -1,6 +1,6 @@
 # Adversarial Prompt Optimizer
 
-A GAN-like system where Attack and Defense prompts compete and improve using Gemini.
+A GAN-like system where Attack and Defense prompts compete and improve.
 
 ## Setup
 
