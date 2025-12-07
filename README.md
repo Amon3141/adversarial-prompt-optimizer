@@ -2,6 +2,8 @@
 
 A GAN-like system where Attack and Defense prompts compete and improve.
 
+<img width="1546" height="949" alt="Screenshot" src="https://github.com/user-attachments/assets/1cd6d1df-600d-4d21-8218-0b3df679b2b9" />
+
 ## Setup
 
 1. Install dependencies:
