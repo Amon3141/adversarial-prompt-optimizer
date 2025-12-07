@@ -1,6 +1,7 @@
 # Adversarial Prompt Optimizer
 
 A GAN-like multi-agent system where Attack and Defense prompts compete and improve. This code was used for [atmaCup #21](https://www.guruguru.science/competitions/28), an LLM vulnerability competition challenging participants to create both adversarial prompts that evade filters to generate harmful content and robust defense prompts that block them.
+
 Architected by me, Implemented by Gemini.
 
 <img width="1546" height="949" alt="Screenshot" src="https://github.com/user-attachments/assets/1cd6d1df-600d-4d21-8218-0b3df679b2b9" />
